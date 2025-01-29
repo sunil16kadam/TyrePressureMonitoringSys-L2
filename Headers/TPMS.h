@@ -12,7 +12,9 @@ public:
     void startMonitoring();
     void stopMonitoring();
     void startLogging();
+    bool connectToDashboard();
     void handleError();
+    void acquireSensorData();
 
 private:
     std::shared_ptr<State> currentState;

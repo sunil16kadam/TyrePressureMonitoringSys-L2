@@ -1,10 +1,17 @@
 #include "../Headers/LoggingState.h"
 #include "../Headers/TPMS.h"
 #include "../Headers/MonitoringState.h"
+#include "../Headers/ErrorState.h"
+#include <iostream>
 
 void LoggingState::enter(TPMS& tpms) {
     std::cout << "Entering Logging State. Logging tyre data." << std::endl;
-    tpms.startLogging(); // Assumes a method to log data
+    try {
+        tpms.startLogging();
+    } catch (const std::exception& e) {
+        std::cerr << "File logging failed: " << e.what() << std::endl;
+        tpms.handleError(); // Transition to ErrorState
+    }
 }
 
 void LoggingState::exit(TPMS& tpms) {
@@ -13,8 +20,9 @@ void LoggingState::exit(TPMS& tpms) {
 
 void LoggingState::handleEvent(TPMS& tpms, const std::string& event) {
     if (event == "monitor") {
-        tpms.setState(std::make_shared<MonitoringState>());
+        tpms.setState(std::make_unique<MonitoringState>());
     } else {
-        std::cout << "Invalid event in Logging State." << std::endl;
+        std::cerr << "Invalid event in Logging State." << std::endl;
+        tpms.handleError(); // Transition to ErrorState on unexpected event
     }
 }
