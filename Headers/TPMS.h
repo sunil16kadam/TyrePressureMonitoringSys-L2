@@ -18,6 +18,10 @@ public:
 
 private:
     std::shared_ptr<State> currentState;
+
+    std::mutex logMutex;                    // Ensure thread-safe logging
+    std::vector<std::string> tyreData;      // Stores sensor data
+
 };
 
 #endif // TPMS_H

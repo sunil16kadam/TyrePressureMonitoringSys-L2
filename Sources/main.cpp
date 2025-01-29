@@ -11,10 +11,14 @@
 int main() {
     TPMS tpms;
 
+    // tpms.handleEvent("start");
+    // while (true);
+
     std::string command;
     while (true) {
         std::cout << "Enter command (start/stop/log/recover/exit): ";
         std::cin >> command;
+        //command = "start";
 
         if (command == "exit") {
             std::cout << "Exiting system." << std::endl;
