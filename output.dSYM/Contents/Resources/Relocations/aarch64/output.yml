@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/sunil.kadam16/Projects/VSCodeProject/TyrePressureMonitoringSys-L2/output'
+relocations:     []
+...

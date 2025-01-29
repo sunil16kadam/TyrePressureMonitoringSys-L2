@@ -1,0 +1,249 @@
+1. TPMS Monitoring Statechart Diagram
+    States:
+        Idle: The system is initialized but not monitoring.
+        Monitoring: The system is actively monitoring tyre data.
+        Logging: The system logs the data to a file.
+        Error: The system detects an error (e.g., failure to access sensors or file).
+    Transitions:
+        From Idle to Monitoring: When the user starts monitoring.
+        From Monitoring to Logging: When data is read from sensors.
+        From Logging back to Monitoring: After successfully logging the data.
+        From any state to Error: On encountering an exception (e.g., file access error).
+        From Error to Idle: After resolving the issue.
+
+2. User Interface Statechart Diagram
+    States:
+        Idle: The menu is displayed.
+        Waiting for Input: Awaiting user input for a command.
+        Processing Command: Executing the user command (e.g., start or stop monitoring).
+        Exiting: Termination of the application.
+    Transitions:
+        From Idle to Waiting for Input: When the menu is displayed.
+        From Waiting for Input to Processing Command: After the user selects an option.
+        From Processing Command to Idle: After executing the command.
+        From Idle to Exiting: When the user chooses to exit.
+
+3. Tyre Sensor Statechart Diagram
+    States:
+        Inactive: The sensor is not being polled.
+        Reading Data: The sensor generates tyre data (pressure and temperature).
+        Data Ready: The data is available for processing.
+    Transitions:
+        From Inactive to Reading Data: When the monitoring system requests data.
+        From Reading Data to Data Ready: When the data generation is complete.
+        From Data Ready to Inactive: After data is processed by the system.
+
+*****************************************************************************************
+
+Key Features
+    State Design Pattern: Each state is encapsulated in a class (IdleState, MonitoringState).
+    Dynamic State Transition: TPMS dynamically switches between states based on events.
+    Modularity: Each state has its own behavior, making the system easy to extend and maintain.
+    Scalability: Adding new states (e.g., ErrorState) is straightforward.
+
+To further extend the state-based implementation, 
+let's consider incorporating additional functionality and states based on the previously discussed statechart diagrams. 
+We will add the following features and states:
+
+New Features
+    Error State: Handles exceptions such as file access failures or sensor malfunctions.
+    Data Logging State: Handles logging of tyre data while the system monitors.
+    UI Integration: Enhanced user interaction by displaying real-time system status.
+
+*****************************************************************************************
+
+
+
+*****************************************************************************************
+
+Added Features in the Code
+    Error Handling: The ErrorState allows recovery from system faults or exceptions.
+    Data Logging State: Handles dedicated logging actions, separating it from monitoring behavior.
+    User Commands: Added commands for logging and recovery, enhancing interactivity.
+    Future Extensibility: Adding states like MaintenanceState or DiagnosticState is straightforward.
+
+
+In the above implementation, std::shared_ptr is used to manage the states of the Tyre Pressure Monitoring System (TPMS). Here's why it is appropriate in this context:
+
+1. Shared Ownership
+Each State object is shared between the TPMS system and its current logic. The std::shared_ptr allows multiple parts of the program (like the TPMS class and potentially other modules) to reference the same state object.
+For example, if the TPMS transitions to a new state, the old state object is safely destroyed when no other references exist.
+2. Automatic Memory Management
+By using std::shared_ptr, we don't need to manually manage the lifecycle of State objects (like explicitly delete-ing them). When no std::shared_ptr instances reference a particular State object, it is automatically deallocated.
+This ensures RAII principles are adhered to, preventing resource leaks.
+3. Safe Transitions Between States
+During a state transition (setState function), the std::shared_ptr safely manages the current state:
+The current state is replaced with a new state (std::make_shared).
+The reference count of the old state decreases, and it is deleted if no references remain.
+This avoids dangling pointers or undefined behavior, which might occur with raw pointers.
+4. Exception Safety
+The use of std::shared_ptr provides robust exception safety. If an exception is thrown during state transitions, the shared_ptr will correctly clean up the state objects, ensuring that resources are not leaked.
+5. Flexibility for Future Features
+Using std::shared_ptr allows additional flexibility if states need to be shared or accessed elsewhere in the system.
+For example, if a debugging system or logger needs to access the current state, it can safely acquire a shared_ptr to the state without worrying about its validity.
+Future extensions (like saving and restoring state information) are easier with shared_ptr compared to raw or unique pointers.
+Why Not std::unique_ptr?
+While std::unique_ptr is another smart pointer that would also work here (since there is typically only one owner of the state at a time), the primary reasons for using std::shared_ptr instead are:
+
+Ease of State Transitions: During a state transition, the old state may still be referenced while transitioning to a new one. std::shared_ptr handles this gracefully.
+Potential for Multiple Owners: If future requirements include having multiple components (like monitoring modules, logging systems, etc.) reference the same state, std::shared_ptr provides a natural mechanism for shared ownership.
+When Should std::unique_ptr Be Used Instead?
+If the states are strictly owned by the TPMS system, and no other component requires access, then std::unique_ptr would suffice. In that case:
+
+The setState function would std::move the unique_ptr to transfer ownership.
+The implementation would be slightly more lightweight and may avoid the overhead of reference counting.
+
+
+Here’s how the implementation would look if we used std::unique_ptr instead of std::shared_ptr to manage state objects. This approach assumes that each state is strictly owned by the TPMS system, and no other component needs to share ownership of state objects.
+
+Updated Code with std::unique_ptr
+State.h
+No changes needed here. State remains an abstract base class.
+
+#ifndef STATE_H
+#define STATE_H
+
+#include <string>
+
+class TPMS;
+
+class State {
+public:
+    virtual ~State() = default;
+    virtual void enter(TPMS& tpms) = 0;
+    virtual void exit(TPMS& tpms) = 0;
+    virtual void handleEvent(TPMS& tpms, const std::string& event) = 0;
+};
+
+#endif // STATE_H
+IdleState.h
+No changes; same for all other State subclasses.
+
+IdleState.cpp
+No changes in the logic; the usage of unique_ptr is reflected in TPMS management instead.
+
+TPMS.h
+We replace std::shared_ptr with std::unique_ptr for managing the current state.
+
+#ifndef TPMS_H
+#define TPMS_H
+
+#include "State.h"
+#include <memory> // For std::unique_ptr
+
+class TPMS {
+public:
+    TPMS();
+    void setState(std::unique_ptr<State> newState);
+    void handleEvent(const std::string& event);
+    void startMonitoring();
+    void stopMonitoring();
+    void startLogging();
+    void handleError();
+
+private:
+    std::unique_ptr<State> currentState;
+};
+
+#endif // TPMS_H
+TPMS.cpp
+The main difference is how states are created and transitioned using std::unique_ptr.
+
+#include "TPMS.h"
+#include "IdleState.h"
+#include "MonitoringState.h"
+#include "LoggingState.h"
+#include "ErrorState.h"
+#include <iostream>
+
+TPMS::TPMS() {
+    currentState = std::make_unique<IdleState>();
+    currentState->enter(*this);
+}
+
+void TPMS::setState(std::unique_ptr<State> newState) {
+    currentState->exit(*this); // Exit the current state
+    currentState = std::move(newState); // Transfer ownership of the new state
+    currentState->enter(*this); // Enter the new state
+}
+
+void TPMS::handleEvent(const std::string& event) {
+    currentState->handleEvent(*this, event);
+}
+
+void TPMS::startMonitoring() {
+    std::cout << "TPMS started monitoring tyres." << std::endl;
+    // Add monitoring logic (e.g., spawn threads to collect data)
+}
+
+void TPMS::stopMonitoring() {
+    std::cout << "TPMS stopped monitoring tyres." << std::endl;
+    // Add logic to stop monitoring
+}
+
+void TPMS::startLogging() {
+    std::cout << "Logging tyre data..." << std::endl;
+    // Implement logging functionality
+}
+
+void TPMS::handleError() {
+    std::cout << "Error encountered! Switching to Error State." << std::endl;
+    setState(std::make_unique<ErrorState>());
+}
+State Transitions
+When transitioning states, the new state is created using std::make_unique and passed to the setState function. For example, here's how transitions are handled in the IdleState and MonitoringState.
+
+IdleState.cpp
+
+#include "IdleState.h"
+#include "TPMS.h"
+#include "MonitoringState.h"
+
+void IdleState::enter(TPMS& tpms) {
+    std::cout << "Entering Idle State." << std::endl;
+}
+
+void IdleState::exit(TPMS& tpms) {
+    std::cout << "Exiting Idle State." << std::endl;
+}
+
+void IdleState::handleEvent(TPMS& tpms, const std::string& event) {
+    if (event == "start") {
+        tpms.setState(std::make_unique<MonitoringState>()); // Transition to MonitoringState
+    } else {
+        std::cout << "Invalid event in Idle State." << std::endl;
+    }
+}
+
+MonitoringState.cpp
+#include "MonitoringState.h"
+#include "TPMS.h"
+#include "IdleState.h"
+
+void MonitoringState::enter(TPMS& tpms) {
+    std::cout << "Entering Monitoring State." << std::endl;
+    tpms.startMonitoring();
+}
+
+void MonitoringState::exit(TPMS& tpms) {
+    std::cout << "Exiting Monitoring State." << std::endl;
+    tpms.stopMonitoring();
+}
+
+void MonitoringState::handleEvent(TPMS& tpms, const std::string& event) {
+    if (event == "stop") {
+        tpms.setState(std::make_unique<IdleState>()); // Transition to IdleState
+    } else {
+        std::cout << "Invalid event in Monitoring State." << std::endl;
+    }
+}
+
+Main Function
+No changes are needed here. The main.cpp file remains the same.
+
+Why Use std::unique_ptr in This Case?
+Exclusive Ownership: Each state is exclusively owned by the TPMS object, making std::unique_ptr the natural choice.
+Lighter Overhead: std::unique_ptr is more lightweight than std::shared_ptr because it does not maintain a reference count.
+Automatic Resource Management: Just like std::shared_ptr, std::unique_ptr ensures proper cleanup when the pointer goes out of scope.
+Clear Ownership Semantics: By using std::unique_ptr, the ownership and lifecycle of each state object are unambiguous.
+

@@ -1,0 +1,50 @@
+/////////////////////////////////////////////////////////////////////
+// launch.json
+//  Tells VS Code how to launch and debug your application.
+//  It defines how your program will run, where to find the executable,
+//  and any additional arguments or settings needed for debugging.
+//  Purposes:
+//    1) Run and Debug Programs:
+//        Specify the executable to run.
+//        Pass arguments to the program.
+//        Configure the debugger for breakpoints, variable inspection, etc.
+//
+//    2) Custom Debugging Settings:
+//        Set working directories.
+//        Add environment variables.
+//        Attach the debugger to a running process.
+//
+//    3) Handle Platform-Specific Configurations:
+//        Configure debugging for Windows, Linux, or macOS.
+/////////////////////////////////////////////////////////////////////
+
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(lldb) Launch",       // Configuration name shown in VS Code
+            "type": "cppdbg",              // Debugger type
+            "request": "launch",           // Launch a new debugging session
+            "program": "${workspaceFolder}/output",  // Path to the compiled executable
+            "args": [],                    // Arguments passed to the program (optional)
+            "stopAtEntry": false,          // Don't stop at the program's entry point
+            "cwd": "${workspaceFolder}",   // Working directory
+            "environment": [],             // Environment variables (optional)
+            "externalConsole": false,      // Use VS Code's Debug Console instead of an external terminal
+                                           // true: Use an external terminal for program output.
+            "MIMode": "lldb",              // Debugger mode for macOS
+            "preLaunchTask": "build",      // Task to run before launching (build task)
+            "setupCommands": [             // LLDB-specific commands
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.inline-breakpoint-strategy always",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
+
+// Important:
+// The "label": "build" in tasks.json must match the preLaunchTask in launch.json.
+// Otherwise, debugging will not be supported.
