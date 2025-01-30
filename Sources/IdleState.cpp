@@ -15,5 +15,6 @@ void IdleState::handleEvent(TPMS& tpms, const std::string& event) {
         tpms.setState(std::make_shared<MonitoringState>());
     } else {
         std::cout << "Invalid event in Idle State." << std::endl;
+        // spk: should we exit or go to error state or ignore?
     }
 }

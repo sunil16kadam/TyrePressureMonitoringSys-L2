@@ -1,0 +1,65 @@
+********************************************************************************
+                        Tyre Pressure Monitoring System
+********************************************************************************
+
+********************************************************************************
+1. Project Overview
+********************************************************************************
+  Develop a Tyre Pressure Monitoring System (TPMS) to continuously monitor
+  the pressure and temperature of vehicle tyres and alert the driver in case of abnormal conditions.
+  The system should simulate real-world scenarios
+  and include features such as sensor data acquisition, data processing, and alert mechanisms.
+
+********************************************************************************
+2. Functional Requirements
+********************************************************************************
+
+********************************************************************************
+1. Sensor Data Acquisition
+********************************************************************************
+
+    The system should read tyre pressure and temperature data from sensors.
+    The data should be acquired periodically (e.g., every 10 seconds).
+    If the sensor fails, an error should be logged.
+
+********************************************************************************
+2. Multithreading for Real-Time Processing
+********************************************************************************
+
+    The system should use separate threads for:
+    Acquiring sensor data.
+    Processing the acquired data.
+    Logging tyre information.
+    Threads should not block each other to ensure real-time operation.
+
+********************************************************************************
+3. Logging Tyre Data
+********************************************************************************
+
+    Collected tyre pressure and temperature readings should be logged into a file (TyreData.log).
+    Each log entry should include a timestamp.
+    If the log file cannot be opened, an error should be displayed.
+
+********************************************************************************
+4. Safety Mechanism & Error Handling
+********************************************************************************
+
+    If a sensor fails, the system should:
+    Log the failure.
+    Transition to an error state and alert the driver.
+    If file logging fails, an appropriate error message should be displayed.
+
+********************************************************************************
+5. User Interface (Optional)
+********************************************************************************
+
+    The system can provide a basic console-based UI to:
+    Start and stop monitoring.
+    View real-time tyre pressure data.
+
+********************************************************************************
+6. Thread Synchronization
+********************************************************************************
+
+    A mutex (std::mutex) should be used to prevent multiple threads from accessing shared data at the same time.
+    Avoid deadlocks and race conditions.

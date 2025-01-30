@@ -52,6 +52,49 @@ New Features
 
 *****************************************************************************************
 
+Driver is an Actor, external to the system. In this case, it is Client function main().
+Client builds the tpms system. (I.e. instantiate TPMS)
+    [TPMS is designed to go through state machine.
+    From the base class "State", derived states are "Idle", "Monitoring", "Logging" and "Error".
+    TPMS maintains a pointer "currentState" which is of type State* (I.e. Base*).
+    This is necessary for runtime polymorphism.]
+tpms now goes to Idle state. I.e. currentState now starts pointing to Idle state.
+
+Client is now ready to either send event to different objects in the system or exit the system.
+Event is the command, either start or stop or log or recover or exit.
+The only acceptable command when tpms is in Idle state is "start" or "exit".
+Upon "exit" request, client exits the program.
+Upon "start" command, Client request tpms to handle the event ("start"). 
+I.e. client request tpms to start the system.
+tpms state changes from "Idle" to "Monitoring".
+
+tpms upon entering into "monitoring" state, performs two things.
+1) It enters into monitoring state and starts monitoring.
+2) It starts a Lambda thread (unnamed) which runs every fixed T interval.
+
+    (1) As a part of monitoring, tpms spawns a thread "dataThread".
+    This thread start acquiring sensor data i.e. tyre pressure for all the 4 tyres.
+    This data is stored in local vector 'tyreData'.
+    datathread runs continuously (since it is detached) in addition to main thread.
+    main thread continues to accept the command , either start or stop or log or recover or exit.
+
+    (2) Unnamed Lambda threads changes the state of tpms from "monitoring" to "log".
+    and request tpms to handle this "log" event.
+    
+tpms checks allowed events [stop or log] in "monitoringring" state which is its currentState.
+Upon receiving "stop" event,
+    enters into "Idle" state.
+
+Upon receiving "log" event,
+    enters into "logging" state.
+    logs the 'tyreData' into a file 'TyreData.log' 
+
+Upon receiving Invalid event or exception, 
+    enters into "Error" state.
+    In the "Error" state, tpms expects only "receover" command i.e. event.
+    Upon receiving "recover" event, tpms enter into "Idle" state.
+
+
 
 
 *****************************************************************************************

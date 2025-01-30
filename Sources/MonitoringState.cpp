@@ -18,7 +18,7 @@ void MonitoringState::enter(TPMS& tpms) {
     // Automatically transition to Logging State after 1 minutes
     std::thread([&tpms]() {
         //std::this_thread::sleep_for(std::chrono::minutes(1));
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
         tpms.handleEvent("log");  // Triggers Logging State
     }).detach();
 }
