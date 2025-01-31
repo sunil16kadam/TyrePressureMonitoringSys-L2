@@ -21,7 +21,7 @@ int main() {
         //command = "start";
 
         if (command == "exit") {
-            std::cout << "Exiting system." << std::endl;
+            std::cout << "Exiting system..." << std::endl;
             break;
         }
 

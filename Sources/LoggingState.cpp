@@ -5,7 +5,7 @@
 #include <iostream>
 
 void LoggingState::enter(TPMS& tpms) {
-    std::cout << "Entering Logging State. Logging tyre data." << std::endl;
+    std::cout << "Entering Logging State to Log tyre data." << std::endl;
     try {
         tpms.startLogging();
     } catch (const std::exception& e) {
@@ -23,6 +23,6 @@ void LoggingState::handleEvent(TPMS& tpms, const std::string& event) {
         tpms.setState(std::make_unique<MonitoringState>());
     } else {
         std::cerr << "Invalid event in Logging State." << std::endl;
-        tpms.handleError(); // Transition to ErrorState on unexpected event
+        tpms.setState(std::make_shared<ErrorState>());
     }
 }

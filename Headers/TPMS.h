@@ -29,6 +29,20 @@ private:
     std::mutex logMutex;                    // Ensure thread-safe logging
     std::vector<std::string> tyreData;      // Stores sensor data
     std::atomic<bool> running{false};       // Flag to control thread execution
+    std::atomic<bool> log_thread_running;       // Flag to control thread execution
+
+public:
+    std::thread logThread;
+    void loggingTask() {
+        while (log_thread_running) {
+            std::this_thread::sleep_for(std::chrono::seconds(5));  // Simulated logging interval
+            std::lock_guard<std::mutex> lock(logMutex);
+            if (!log_thread_running) break;  // Stop if TPMS is being destroyed
+
+            std::cout << "Logging event triggered" << std::endl;
+            handleEvent("log");
+        }
+    }
 
 };
 

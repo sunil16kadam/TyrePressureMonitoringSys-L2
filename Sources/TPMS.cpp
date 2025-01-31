@@ -1,21 +1,34 @@
 #include "../Headers/TPMS.h"
 #include "../Headers/IdleState.h"
 #include "../Headers/LoggingState.h"
+#include "../Headers/MonitoringState.h"
 #include "../Headers/ErrorState.h"
 #include <thread>
 #include <iostream>
 #include <fstream> 
 
-TPMS::TPMS() {
+TPMS::TPMS() : log_thread_running(true), logThread([this]() { loggingTask(); }) {
     // currentState is a pointer of type Base class
     // At run time, it will point to appropriate state
     // This is Runtime polymorphism
     // At start, when TPMS system in instatiated, currentState points to Idle state.
     currentState = std::make_shared<IdleState>();
     currentState->enter(*this);
+
+    std::cout << "TPMS object created. Logging thread started." << std::endl;
 }
 
 TPMS::~TPMS() {
+    {
+        std::lock_guard<std::mutex> lock(logMutex);
+        log_thread_running = false;  // Signal thread to stop
+    }
+    
+    if (logThread.joinable()) {
+        logThread.join();  // Wait for the thread to finish execution
+    }
+    std::cout << "TPMS object destroyed. Logging thread safely joined." << std::endl;
+
     stopMonitoring(); // Properly stop the thread before exiting
 }
 
@@ -42,14 +55,20 @@ void TPMS::startMonitoring() {
     std::cout << "TPMS started monitoring tyres." << std::endl;
     running = true;  // Set flag to indicate monitoring is active
 
+    // Create a new thread to handle continuous tyre pressure monitoring
     dataThread = std::thread([this]() {
         while (running) {
             try {
                 acquireSensorData();
+                // delay to simulate sensor read interval
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));  // Simulated delay
             } catch (const std::exception& e) {
                 std::cerr << "Data acquisition thread failed: " << e.what() << std::endl;
+            
+                // Handle the error by transitioning to an error state
                 handleError();
+            
+                // Stop the monitoring process to prevent further faulty readings
                 running = false;  // Stop monitoring on error
             }
         }
@@ -62,33 +81,34 @@ void TPMS::startMonitoring() {
     //     }
     // } catch (const std::exception& e) {
     //     std::cerr << "Monitoring Error: " << e.what() << std::endl;
-    //     handleError(); // Transition to ErrorState
+    //     setState(std::make_shared<ErrorState>());
     // }
 }
 
 // This function is responsible for simulating the retrieval of tyre pressure data from sensors.
 void TPMS::acquireSensorData() {
     // Simulated sensor failure
-    // generates numbers 0, 1, or 2. If the result is 0, it simulates a failure.
+    // generates numbers 0, 1, 2, etc upto n-1. If the result is 0, it simulates a failure.
     int random = rand() % 1000;
-    std::cout << "random: " << random << std::endl;
-
     if (random == 0) {
         // This exception is caught in the lambda function inside startMonitoring(), 
         // ensuring proper error handling.
         throw std::runtime_error("Sensor failure detected!");
     }
         
+    // Ensure thread safety when accessing shared resources (tyreData vector and log file)
     std::lock_guard<std::mutex> lock(logMutex); // Ensure thread safety
     static int pressure = 0;
     tyreData.push_back(std::string("Tyre1: " + std::to_string((pressure++)%50) + " PSI"));
     tyreData.push_back(std::string("Tyre2: " + std::to_string((pressure++)%50) + " PSI"));
     tyreData.push_back(std::string("Tyre3: " + std::to_string((pressure++)%50) + " PSI"));
     tyreData.push_back(std::string("Tyre4: " + std::to_string((pressure++)%50) + " PSI"));
-    //  tyreData.push_back(std::string("Tyre2: 30 PSI"));
-    //  tyreData.push_back(std::string("Tyre3: 31 PSI"));
-    //  tyreData.push_back(std::string("Tyre4: 29 PSI"));
+
+    // Log a message indicating that tyre data collection was completed
+    // We collect the data in local buffer.
+    // We will actually write buffer data into logfile after fixed interval (in a thread)
     std::ofstream logFile("TyreData.log", std::ios::app);  // Open file in append mode
+    std::cout << "***** Tyre pressure for all 4 tyres collected *****\n";
     logFile << "***** Tyre pressure for all 4 tyres collected *****\n";
     logFile.close();  // Close the file explicitly (optional)
 }
@@ -113,7 +133,7 @@ void TPMS::startLogging() {
     std::cout << "Logging tyre data..." << std::endl;
     
     // Implement logging functionality
-    std::lock_guard<std::mutex> lock(logMutex);  // Ensure thread safety
+    // std::lock_guard<std::mutex> lock(logMutex);  // Ensure thread safety
 
     try {
         // If logFile is a local variable. 
@@ -124,6 +144,7 @@ void TPMS::startLogging() {
         }
 
         for (const auto& data : tyreData) {
+            std::cout << "data: " << data << std::endl;
             logFile << data << std::endl;  // Write sensor data to log file
         }
         logFile.close();  // Close the file explicitly (optional)
@@ -132,8 +153,8 @@ void TPMS::startLogging() {
     } catch (const std::exception& e) {
         std::cerr << "Error during logging: " << e.what() << std::endl;
     }
-    // spk: Enter into "monitoring" state again
-    handleEvent("monitor");  // Enter into "monitoring" state again
+    // Enter into "monitoring" state again
+    setState(std::make_shared<MonitoringState>());
 }
 
 void TPMS::handleError() {
