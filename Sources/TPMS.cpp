@@ -7,7 +7,7 @@
 #include <iostream>
 #include <fstream> 
 
-TPMS::TPMS() : log_thread_running(true), logThread([this]() { loggingTask(); }) {
+TPMS::TPMS() : flag_data_logger_thread_running(true), logThread([this]() { loggingTask(); }) {
     // currentState is a pointer of type Base class
     // At run time, it will point to appropriate state
     // This is Runtime polymorphism
@@ -20,8 +20,8 @@ TPMS::TPMS() : log_thread_running(true), logThread([this]() { loggingTask(); }) 
 
 TPMS::~TPMS() {
     {
-        std::lock_guard<std::mutex> lock(logMutex);
-        log_thread_running = false;  // Signal thread to stop
+        std::lock_guard<std::mutex> lock(mutex_tyre_data); // spk: not required
+        flag_data_logger_thread_running = false;  // Signal thread to stop
     }
     
     if (logThread.joinable()) {
@@ -47,17 +47,17 @@ void TPMS::handleEvent(const std::string& event) {
 
 // This function starts monitoring tyre pressure by launching a separate thread.
 void TPMS::startMonitoring() {
-    if (running) {
+    if (flag_data_sensing_thread_running) {
         std::cout << "Monitoring is already running. Ignoring duplicate call.\n";
         return;  // Prevents starting a new thread if one is already running
     }
 
     std::cout << "TPMS started monitoring tyres." << std::endl;
-    running = true;  // Set flag to indicate monitoring is active
+    flag_data_sensing_thread_running = true;  // Set flag to indicate monitoring is active
 
     // Create a new thread to handle continuous tyre pressure monitoring
     dataThread = std::thread([this]() {
-        while (running) {
+        while (flag_data_sensing_thread_running) {
             try {
                 acquireSensorData();
                 // delay to simulate sensor read interval
@@ -69,7 +69,7 @@ void TPMS::startMonitoring() {
                 handleError();
             
                 // Stop the monitoring process to prevent further faulty readings
-                running = false;  // Stop monitoring on error
+                flag_data_sensing_thread_running = false;  // Stop monitoring on error
             }
         }
     });
@@ -97,7 +97,7 @@ void TPMS::acquireSensorData() {
     }
         
     // Ensure thread safety when accessing shared resources (tyreData vector and log file)
-    std::lock_guard<std::mutex> lock(logMutex); // Ensure thread safety
+    std::lock_guard<std::mutex> lock(mutex_tyre_data); // Ensure thread safety
     static int pressure = 0;
     tyreData.push_back(std::string("Tyre1: " + std::to_string((pressure++)%50) + " PSI"));
     tyreData.push_back(std::string("Tyre2: " + std::to_string((pressure++)%50) + " PSI"));
@@ -119,9 +119,10 @@ bool TPMS::connectToDashboard() {
 }
 
 void TPMS::stopMonitoring() {
-    if (!running) return;  // If monitoring is already stopped, do nothing
+    if (flag_data_sensing_thread_running == false) 
+        return;  // If monitoring is already stopped, do nothing
 
-    running = false;  // Set flag to stop the loop
+    flag_data_sensing_thread_running = false;  // Set flag to stop the loop
     if (dataThread.joinable()) {
         dataThread.join();  // Wait for the thread to exit
     }
@@ -133,7 +134,7 @@ void TPMS::startLogging() {
     std::cout << "Logging tyre data..." << std::endl;
     
     // Implement logging functionality
-    // std::lock_guard<std::mutex> lock(logMutex);  // Ensure thread safety
+    std::lock_guard<std::mutex> lock(mutex_tyre_data);  // Ensure thread safety
 
     try {
         // If logFile is a local variable. 
@@ -162,4 +163,14 @@ void TPMS::handleError() {
     setState(std::make_shared<ErrorState>());
 }
 
+void TPMS::loggingTask() {
+    while (flag_data_logger_thread_running) {
+        std::this_thread::sleep_for(std::chrono::seconds(5));  // Simulated logging interval
+        if (flag_data_logger_thread_running == false) 
+            break;  // Stop if TPMS is being destroyed
+        // Keep logging    
+        std::cout << "Logging event triggered" << std::endl;
+        handleEvent("log");
+    }
+}
 

@@ -17,22 +17,6 @@ void MonitoringState::enter(TPMS& tpms) {
         std::cerr << "Error in Monitoring State: " << e.what() << std::endl;
         tpms.handleError(); // Transition to ErrorState
     }
-    //Automatically transition to Logging State after 5 minutes
-    // Store the future, even if we don't use it
-    //     //std::future<void> futureLog = std::async(std::launch::async, logEvent);
-    //     std::future<void> futureLog = std::async(std::launch::async, [&tpms]() {
-    //     std::this_thread::sleep_for(std::chrono::seconds(5));
-    //     tpms.handleEvent("log");
-    // });
-
-    // std::thread([&tpms]() {
-    //     //std::this_thread::sleep_for(std::chrono::minutes(1));
-    //     std::this_thread::sleep_for(std::chrono::seconds(5));
-    //     tpms.handleEvent("log");  // Triggers Logging State
-    // }).detach();
-
-    //std::jthread logThread([&tpms]() { tpms.loggingTask(tpms); });
-    
 }
 
 void MonitoringState::exit(TPMS& tpms) {

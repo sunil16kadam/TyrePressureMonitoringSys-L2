@@ -4,14 +4,55 @@
         Monitoring: The system is actively monitoring tyre data.
         Logging: The system logs the data to a file.
         Error: The system detects an error (e.g., failure to access sensors or file).
-    Transitions:
-        From Idle to Monitoring: When the user starts monitoring.
-        From Monitoring to Logging: When data is read from sensors.
-        From Logging back to Monitoring: After successfully logging the data.
-        From any state to Error: On encountering an exception (e.g., file access error).
-        From Error to Idle: After resolving the issue.
+        Data Logging State: Handles logging of tyre data while the system monitors.
 
-2. User Interface Statechart Diagram
+    Transitions:
+
+        1) System power on to Idle:
+            Upon Entry: Display menu.
+                        Wait for 'start' command.
+            Upon Exit:  None
+            Events to handle: start
+
+        2) From Idle to Monitoring: When user issues 'start' command to starts monitoring 
+            Upon Entry: start monitoring, i.e. 
+                        Acquire data, 
+                        Store in local buffer
+            Upon Exit:  stop monitoring
+            Events to handle: stop, log
+
+        3) From Monitoring to Logging: After a fixed interval
+            Upon Entry: start logging
+            Upon Exit:  None
+            Events to handle: None (Null transition to Montoring state)
+       
+        4) From Logging back to Monitoring: After successfully logging the data.
+            Upon Entry: start monitoring, i.e. 
+                        Acquire data, 
+                        Store in local buffer
+            Upon Exit:  stop monitoring
+            Events to handle: stop, log
+        
+        5) From any state to Error: On encountering an exception (e.g., file access error).
+            Upon Entry: Take steps to recover
+            Upon Exit:  None
+            Events to handle: receover
+        
+        6) From Error to Idle: After resolving the issue.
+            Upon Entry: Display menu.
+                        Wait for 'start' command.
+            Upon Exit:  None
+            Events to handle: start
+
+    In any state, if event other than those allowed are received, system goes Error state
+    I.e. system goes to Error state when
+        a) In any state, if event other than those allowed are received, system goes Error state
+        b) On encountering an exception, Examples coule be -
+            - File access error
+            - Connection failure
+            - Sensor error (or while reading the sensor data)
+
+2. User Interface Statechart Diagram (Future enhancement)
     States:
         Idle: The menu is displayed.
         Waiting for Input: Awaiting user input for a command.
@@ -23,7 +64,7 @@
         From Processing Command to Idle: After executing the command.
         From Idle to Exiting: When the user chooses to exit.
 
-3. Tyre Sensor Statechart Diagram
+3. Tyre Sensor Statechart Diagram (Future enhancement)
     States:
         Inactive: The sensor is not being polled.
         Reading Data: The sensor generates tyre data (pressure and temperature).
@@ -33,26 +74,19 @@
         From Reading Data to Data Ready: When the data generation is complete.
         From Data Ready to Inactive: After data is processed by the system.
 
-*****************************************************************************************
-
 Key Features
     State Design Pattern: Each state is encapsulated in a class (IdleState, MonitoringState).
     Dynamic State Transition: TPMS dynamically switches between states based on events.
     Modularity: Each state has its own behavior, making the system easy to extend and maintain.
     Scalability: Adding new states (e.g., ErrorState) is straightforward.
 
-To further extend the state-based implementation, 
-let's consider incorporating additional functionality and states based on the previously discussed statechart diagrams. 
-We will add the following features and states:
 
-New Features
-    Error State: Handles exceptions such as file access failures or sensor malfunctions.
-    Data Logging State: Handles logging of tyre data while the system monitors.
-    UI Integration: Enhanced user interaction by displaying real-time system status.
-
+*****************************************************************************************
+Working of the syste:
 *****************************************************************************************
 
 Driver is an Actor, external to the system. In this case, it is Client function main().
+
 Client builds the tpms system. (I.e. instantiate TPMS)
     [TPMS is designed to go through state machine.
     From the base class "State", derived states are "Idle", "Monitoring", "Logging" and "Error".
@@ -95,11 +129,88 @@ Upon receiving Invalid event or exception,
     Upon receiving "recover" event, tpms enter into "Idle" state.
 
 
+*****************************************************************************************
+Thread management :
+*****************************************************************************************
+    1) dataThread 
+        Purpose: Reads data from sensor and store in local buffer
+        When created: When tpms enters into Monitoring state
+        When destroyed: When tpms exit from Monitoring state
+        Frequence: 1 sec
+
+    2) logThread
+        Purpose: Reads data from local buffer and write to logfile TyreData.log
+        When created: When tpms is instantiated
+        When destroyed: When tpms is destroyed
+        Frequence: 5 sec
+
+Flags to control thread execution:
+    Individual flags for each tread
+    Data type: std::atomic<bool>
+    
+    1) flag_data_sensing_thread_running:
+        Working:    ReSet when tpms is instantiated
+                    set when dataThread is created
+        Purpsoe:
+            Do not recreate dataThread when this flag is already set   
+            dataThread to keep reading sensor data as long as this flag is set  
+            Stop monitoring only when this flag is set       
+    
+    2) flag_data_logger_thread_running:       
+        Working:    Set when tpms is instantiated
+                    Reset when 
+                        a) tpms is destroyed, 
+                        b) exception during data read from sensor, 
+                        c) monitoring is stopped (transition from Monitoring to Idle/Logging state)
+        Purpose:
+            logThread keeps logging the data to file as long as this flag is set
+            While logging the data, at any point if this flag is found reset, stop logging.
+
+Life cycle of dataThread and logThread:
+***************************************
+
+When tpms is instantiated, 
+    reset data_sensing_thread_running
+    Set the flag flag_data_logger_thread_running
+    Create logThread with thread function loggingTask
+
+When tpms is destroyed, 
+    When tpms is instantiated, 
+        Reset the flag flag_data_logger_thread_running
+
+State machien for tpms
+*****************************************************************************************
+
+When tpms transits from Idle to Monitoring state, tpms start monitoring.
+    If data_sensing_thread_running is false, 
+        Create dataThread 
+        data_sensing_thread_running = true
+
+    Actions in dataThread:    
+        Read sensor data and store in local buffer "tyreData"
+        access to tyreData is safeguarded using mutex_tyre_data
+
+    If data_sensing_thread_running is true, it means thread is already running.
+        In this case, do not create duplicate dataThread and simply return.
+
+When tpms transits from Monitoring to Idle state (stop command),
+    While exiting from Monitoring state,
+        reset data_sensing_thread_running 
+        dataThread is made to joined. dataThread ends now. 
+
+When tpms transits from Monitoring to Logging state (log command),
+    While exiting from Monitoring state,
+        reset data_sensing_thread_running 
+        dataThread is made to joined. dataThread ends now. 
+        
+    tpms logs data from tyreData buffer to file TyreData.log
+    tpms enters into "monitoring" state again (automatically, when logging is over)
+
 
 
 *****************************************************************************************
 
-Added Features in the Code
+Key Features
     Error Handling: The ErrorState allows recovery from system faults or exceptions.
     Data Logging State: Handles dedicated logging actions, separating it from monitoring behavior.
     User Commands: Added commands for logging and recovery, enhancing interactivity.
@@ -125,6 +236,11 @@ The use of std::shared_ptr provides robust exception safety. If an exception is 
 Using std::shared_ptr allows additional flexibility if states need to be shared or accessed elsewhere in the system.
 For example, if a debugging system or logger needs to access the current state, it can safely acquire a shared_ptr to the state without worrying about its validity.
 Future extensions (like saving and restoring state information) are easier with shared_ptr compared to raw or unique pointers.
+
+*****************************************************************************************
+Draft notes below.
+*****************************************************************************************
+
 Why Not std::unique_ptr?
 While std::unique_ptr is another smart pointer that would also work here (since there is typically only one owner of the state at a time), the primary reasons for using std::shared_ptr instead are:
 

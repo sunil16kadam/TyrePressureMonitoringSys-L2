@@ -4,6 +4,7 @@
 
 void ErrorState::enter(TPMS& tpms) {
     std::cout << "Entering Error State. System encountered an issue." << std::endl;
+    // take steps to recover
 }
 
 void ErrorState::exit(TPMS& tpms) {
@@ -17,3 +18,4 @@ void ErrorState::handleEvent(TPMS& tpms, const std::string& event) {
         std::cout << "Invalid event in Error State. Awaiting recovery action." << std::endl;
     }
 }
+
